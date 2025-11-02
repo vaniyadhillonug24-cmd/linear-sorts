@@ -1,3 +1,23 @@
+/* --- Ensure full-viewport landing + smooth scrolling --- */
+html, body, #root {
+  height: 100%;
+  min-height: 100vh;
+  margin: 0;
+  overflow-y: auto;
+  scroll-behavior: smooth;
+}
+
+/* make sure body background fills */
+.app-root {
+  min-height: 100vh;
+}
+
+/* keep transitions smooth */
+* {
+  transition: all 200ms ease-in-out;
+}
+
+
 body {
   margin: 0;
   padding: 0;

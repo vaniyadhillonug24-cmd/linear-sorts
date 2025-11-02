@@ -1,5 +1,5 @@
 import "./App.css";
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 
 function App() {
@@ -7,9 +7,17 @@ function App() {
   const [input, setInput] = useState("");
   const [sorted, setSorted] = useState([]);
   const [buckets, setBuckets] = useState([]);
+  const [radixSteps, setRadixSteps] = useState([]);
   const [showRangeInput, setShowRangeInput] = useState(false);
+  const [countTable, setCountTable] = useState([]);
+  const resultRef = useRef(null);
 
-  // Algorithm Descriptions
+  const isInitialView =
+    !algorithm &&
+    sorted.length === 0 &&
+    buckets.length === 0 &&
+    radixSteps.length === 0;
+
   const algorithmInfo = {
     counting: {
       title: "Counting Sort Algorithm",
@@ -18,9 +26,9 @@ function App() {
         "2. Create a count array to store frequency of each element.",
         "3. Modify count array by adding previous counts (prefix sum).",
         "4. Place elements into output array in sorted order using count array.",
-        "5. Copy the output back to original array."
+        "5. Copy the output back to original array.",
       ],
-      complexity: "Time Complexity: O(n + k)"
+      complexity: "Time Complexity: O(n + k)",
     },
     radix: {
       title: "Radix Sort Algorithm",
@@ -28,9 +36,9 @@ function App() {
         "1. Find the maximum number to know number of digits.",
         "2. Perform Counting Sort for every digit (from LSD to MSD).",
         "3. For each pass, group elements by current digit (0–9).",
-        "4. Merge all buckets and move to next digit place."
+        "4. Merge all buckets and move to next digit place.",
       ],
-      complexity: "Time Complexity: O(d * (n + k))"
+      complexity: "Time Complexity: O(d * (n + k))",
     },
     bucket: {
       title: "Bucket Sort Algorithm",
@@ -38,14 +46,15 @@ function App() {
         "1. Create empty buckets (usually 10).",
         "2. Distribute elements into buckets based on value range.",
         "3. Sort each bucket individually (using insertion sort or built-in).",
-        "4. Concatenate all buckets to get the sorted array."
+        "4. Concatenate all buckets to get the sorted array.",
       ],
-      complexity: "Time Complexity: O(n + k)"
+      complexity: "Time Complexity: O(n + k)",
     },
   };
 
-  // Counting Sort
   const countingSort = (arr) => {
+    if (!arr.length) return [];
+
     let max = Math.max(...arr);
     let min = Math.min(...arr);
     let range = max - min + 1;
@@ -53,21 +62,29 @@ function App() {
     let output = new Array(arr.length);
 
     for (let i = 0; i < arr.length; i++) count[arr[i] - min]++;
+
+    const tableData = [];
+    for (let i = min; i <= max; i++) {
+      tableData.push({ number: i, count: count[i - min] });
+    }
+    setCountTable(tableData);
+
     for (let i = 1; i < count.length; i++) count[i] += count[i - 1];
     for (let i = arr.length - 1; i >= 0; i--) {
       output[count[arr[i] - min] - 1] = arr[i];
       count[arr[i] - min]--;
     }
+
     return output;
   };
 
-  // Radix Sort
   const countingSortForRadix = (arr, exp) => {
     let output = new Array(arr.length).fill(0);
     let count = new Array(10).fill(0);
 
-    for (let i = 0; i < arr.length; i++)
+    for (let i = 0; i < arr.length; i++) {
       count[Math.floor(arr[i] / exp) % 10]++;
+    }
 
     for (let i = 1; i < 10; i++) count[i] += count[i - 1];
 
@@ -80,14 +97,25 @@ function App() {
     for (let i = 0; i < arr.length; i++) arr[i] = output[i];
   };
 
-  const radixSort = (arr) => {
+  const radixSort = async (arr) => {
+    setRadixSteps([]);
+    const steps = [];
+    if (!arr.length) return arr;
     const max = Math.max(...arr);
-    for (let exp = 1; Math.floor(max / exp) > 0; exp *= 10)
+
+    for (let exp = 1; Math.floor(max / exp) > 0; exp *= 10) {
       countingSortForRadix(arr, exp);
+      steps.push({
+        exp,
+        result: [...arr],
+      });
+      setRadixSteps([...steps]);
+      await new Promise((resolve) => setTimeout(resolve, 600));
+    }
+
     return arr;
   };
 
-  // Bucket Sort
   const bucketSort = async (arr) => {
     let n = arr.length;
     let newBuckets = Array.from({ length: 10 }, () => []);
@@ -97,11 +125,10 @@ function App() {
       let index = Math.floor(arr[i] * 10);
       newBuckets[index].push(arr[i]);
       setBuckets([...newBuckets]);
-      await new Promise((resolve) => setTimeout(resolve, 400));
+      await new Promise((resolve) => setTimeout(resolve, 350));
     }
 
     for (let i = 0; i < 10; i++) newBuckets[i].sort((a, b) => a - b);
-
     return newBuckets.flat();
   };
 
@@ -111,12 +138,24 @@ function App() {
       return;
     }
 
-    let arr = input.split(",").map((n) => parseFloat(n.trim()));
-    let result = [];
+    let arr = input
+      .split(",")
+      .map((n) => parseFloat(n.trim()))
+      .filter((n) => !Number.isNaN(n));
+    if (!arr.length) {
+      alert("Please enter valid numbers separated by commas.");
+      return;
+    }
 
-    if (algorithm === "counting") result = countingSort(arr);
-    else if (algorithm === "radix") result = radixSort(arr);
-    else if (algorithm === "bucket") {
+    let result = [];
+    setCountTable([]);
+
+    if (algorithm === "counting") {
+      result = countingSort(arr);
+    } else if (algorithm === "radix") {
+      setRadixSteps([]);
+      result = await radixSort(arr);
+    } else if (algorithm === "bucket") {
       if (arr.some((n) => n < 0 || n > 1)) {
         alert("All numbers must be between 0 and 1 for Bucket Sort");
         return;
@@ -126,175 +165,265 @@ function App() {
 
     setSorted(result);
     setInput("");
+
+    setTimeout(() => {
+      if (resultRef.current)
+        resultRef.current.scrollIntoView({ behavior: "smooth" });
+    }, 250);
   };
 
+  useEffect(() => {
+    if ((buckets.length > 0 || radixSteps.length > 0) && resultRef.current) {
+      resultRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [buckets, radixSteps]);
+
   return (
-    <div className="min-h-screen flex flex-col md:flex-row items-start justify-center bg-gradient-to-br from-purple-600 via-pink-500 to-yellow-400 text-white p-6 gap-6">
-
-      {/* Left Section - Main Sorting UI */}
-      <div className="flex-1 flex flex-col items-center">
-        <motion.h1
-          className="text-5xl font-extrabold mb-6 text-center drop-shadow-lg"
-          initial={{ y: -50, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-        >
-          Linear Time Sorting
-        </motion.h1>
-
-        <motion.h2
-          className="text-2xl font-semibold mb-8 text-center"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-        >
-          Choose a Sorting Algorithm
-        </motion.h2>
-
-        <div className="flex gap-4 mb-8 flex-wrap justify-center">
-          {["counting", "radix", "bucket"].map((algo) => (
-            <button
-              key={algo}
-              onClick={() => {
-                setAlgorithm(algo);
-                setSorted([]);
-                setBuckets([]);
-                setInput("");
-                setShowRangeInput(algo === "bucket");
-              }}
-              className={`px-6 py-2 rounded-2xl text-lg font-bold transition-all duration-300 ${
-                algorithm === algo
-                  ? "bg-green-400 text-black"
-                  : "bg-white text-purple-700 hover:bg-green-300"
+    <div className="app-root min-h-screen w-full bg-gradient-to-br from-purple-600 via-pink-500 to-yellow-400 text-white">
+      <div
+        className={`layout-wrapper w-full ${
+          isInitialView ? "min-h-screen flex items-center" : "pt-6 pb-12"
+        }`}
+      >
+        <div className="container mx-auto px-6">
+          <div className={`flex flex-col md:flex-row items-start justify-center gap-6`}>
+            <div
+              className={`flex-1 flex flex-col items-center ${
+                isInitialView ? "justify-center" : "justify-start"
               }`}
             >
-              {algo.charAt(0).toUpperCase() + algo.slice(1)} Sort
-            </button>
-          ))}
-        </div>
+              <motion.h1
+                className="text-5xl font-extrabold mb-6 text-center drop-shadow-lg"
+                initial={{ y: -30, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+              >
+                Linear Time Sorting
+              </motion.h1>
 
-        {showRangeInput && (
-          <div className="mb-6 text-center">
-            <label className="mr-4 text-lg font-medium">
-              Range: 0 to 1
-            </label>
-          </div>
-        )}
+              <motion.h2
+                className="text-2xl font-semibold mb-6 text-center"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+              >
+                Choose a Sorting Algorithm
+              </motion.h2>
 
-        {algorithm && (
-          <div className="text-center">
-            <input
-              type="text"
-              placeholder={
-                algorithm === "bucket"
-                  ? "Enter numbers between 0 and 1, separated by commas"
-                  : "Enter integers separated by commas"
-              }
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              className="px-4 py-2 rounded-xl text-black w-80 text-center mb-4 focus:ring-2 focus:ring-yellow-400"
-            />
-            <br />
-            <button
-              onClick={handleSort}
-              className="bg-yellow-400 text-black px-6 py-2 rounded-xl font-bold hover:bg-yellow-300 transition-all"
-            >
-              Sort Now
-            </button>
-          </div>
-        )}
-
-        {algorithm === "bucket" && buckets.length > 0 && (
-          <motion.div
-            className="mt-10 bg-white bg-opacity-20 p-6 rounded-2xl shadow-lg"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-          >
-            <h3 className="text-2xl font-semibold mb-4 text-center">
-              Bucket Distribution
-            </h3>
-            <table className="border-collapse border border-white text-center mx-auto">
-              <thead>
-                <tr>
-                  <th className="border border-white px-4 py-2">Bucket</th>
-                  <th className="border border-white px-4 py-2">Values</th>
-                </tr>
-              </thead>
-              <tbody>
-                {buckets.map((b, i) => (
-                  <tr key={i}>
-                    <td className="border border-white px-4 py-1">{i}</td>
-                    <td className="border border-white px-4 py-1">
-                      {b.map((num, j) => (
-                        <motion.span
-                          key={j}
-                          initial={{ opacity: 0, y: -10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ duration: 0.5 }}
-                          className="inline-block mx-1 bg-yellow-300 text-black rounded px-2 py-1"
-                        >
-                          {num.toFixed(2)}
-                        </motion.span>
-                      ))}
-                    </td>
-                  </tr>
+              <div className="flex gap-4 mb-6 flex-wrap justify-center">
+                {["counting", "radix", "bucket"].map((algo) => (
+                  <button
+                    key={algo}
+                    onClick={() => {
+                      setAlgorithm(algo);
+                      setSorted([]);
+                      setBuckets([]);
+                      setRadixSteps([]);
+                      setCountTable([]);
+                      setInput("");
+                      setShowRangeInput(algo === "bucket");
+                    }}
+                    className={`px-6 py-2 rounded-2xl text-lg font-bold transition-all duration-300 ${
+                      algorithm === algo
+                        ? "bg-green-400 text-black"
+                        : "bg-white text-purple-700 hover:bg-green-300"
+                    }`}
+                  >
+                    {algo.charAt(0).toUpperCase() + algo.slice(1)} Sort
+                  </button>
                 ))}
-              </tbody>
-            </table>
-          </motion.div>
-        )}
+              </div>
 
-        {sorted.length > 0 && (
-          <motion.div
-            className="mt-10 bg-white bg-opacity-20 p-6 rounded-2xl shadow-lg text-center"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-          >
-            <h3 className="text-2xl font-semibold mb-4 text-center">
-              Final Sorted Output :
-            </h3>
-            <div className="flex flex-wrap justify-center gap-3 text-lg">
-              {sorted.map((num, i) => (
-                <motion.span
-                  key={i}
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
-                  transition={{ delay: i * 0.2 }}
-                  className="bg-green-300 text-black rounded px-2 py-1 inline-block"
+              {showRangeInput && (
+                <div className="mb-6 text-center">
+                  <label className="mr-4 text-lg font-medium">Range: 0 to 1</label>
+                </div>
+              )}
+
+              {algorithm && (
+                <div className="text-center">
+                  <input
+                    type="text"
+                    placeholder={
+                      algorithm === "bucket"
+                        ? "Enter numbers between 0 and 1, separated by commas"
+                        : "Enter integers separated by commas"
+                    }
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    className="px-4 py-2 rounded-xl text-black w-80 text-center mb-4 focus:ring-2 focus:ring-yellow-400"
+                  />
+                  <br />
+                  <button
+                    onClick={handleSort}
+                    className="bg-yellow-400 text-black px-6 py-2 rounded-xl font-bold hover:bg-yellow-300 transition-all"
+                  >
+                    Sort Now
+                  </button>
+                </div>
+              )}
+
+              {/* Counting Sort Table */}
+              {algorithm === "counting" && countTable.length > 0 && (
+                <motion.div
+                  className="mt-10 bg-white bg-opacity-20 p-6 rounded-2xl shadow-lg w-full max-w-3xl"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
                 >
-                  {num.toFixed(2)}
-                </motion.span>
-              ))}
-            </div>
-          </motion.div>
-        )}
-      </div>
+                  <h3 className="text-2xl font-semibold mb-4 text-center text-yellow-300">
+                    Counting Table
+                  </h3>
+                  <table className="border-collapse border border-white text-center mx-auto mb-6">
+                    <thead>
+                      <tr>
+                        <th className="border border-white px-4 py-2">Number</th>
+                        <th className="border border-white px-4 py-2">Count</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {countTable.map((row, i) => (
+                        <tr key={i}>
+                          <td className="border border-white px-4 py-1">{row.number}</td>
+                          <td className="border border-white px-4 py-1">{row.count}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {sorted.length > 0 && (
+                    <>
+                      <h3 className="text-xl font-semibold mb-2 text-center">
+                        Final Sorted Output:
+                      </h3>
+                      <p className="text-lg font-medium text-yellow-200 text-center">
+                        {sorted.join(", ")}
+                      </p>
+                    </>
+                  )}
+                </motion.div>
+              )}
 
-      {/* Right Section - Algorithm Info Box */}
-      <motion.div
-        className="md:w-1/3 w-full bg-white bg-opacity-20 p-6 rounded-2xl shadow-lg backdrop-blur-md"
-        initial={{ x: 50, opacity: 0 }}
-        animate={{ x: 0, opacity: 1 }}
-      >
-        {algorithm ? (
-          <>
-            <h2 className="text-3xl font-bold mb-4 text-yellow-300">
-              {algorithmInfo[algorithm].title}
-            </h2>
-            <ul className="list-disc list-inside text-lg mb-4 space-y-2">
-              {algorithmInfo[algorithm].steps.map((step, index) => (
-                <li key={index}>{step}</li>
-              ))}
-            </ul>
-            <p className="font-semibold text-xl text-green-200">
-              {algorithmInfo[algorithm].complexity}
-            </p>
-          </>
-        ) : (
-          <p className="text-lg text-center text-white/80">
-            Select an algorithm to view its steps here ! 
-          </p>
-        )}
-      </motion.div>
+              {/* Radix Sort */}
+              {algorithm === "radix" && radixSteps.length > 0 && (
+                <motion.div
+                  className="mt-10 bg-white bg-opacity-20 p-6 rounded-2xl shadow-lg w-full max-w-3xl"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                >
+                  <h3 className="text-2xl font-semibold mb-4 text-center text-yellow-300">
+                    Step-by-Step Radix Sort Progress
+                  </h3>
+                  <div className="flex flex-col gap-4 mb-6">
+                    {radixSteps.map((step, i) => (
+                      <motion.div
+                        key={i}
+                        className="bg-yellow-300/20 rounded-xl p-4 text-center"
+                        initial={{ opacity: 0, y: -8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.5 }}
+                      >
+                        <p className="font-semibold mb-2">Digit Place: {step.exp}</p>
+                        <p className="text-lg font-medium">{step.result.join(", ")}</p>
+                      </motion.div>
+                    ))}
+                  </div>
+
+                  {/* 🟢 Final Sorted Output for Radix Sort */}
+                  {sorted.length > 0 && (
+                    <>
+                      <h3 className="text-xl font-semibold mb-2 text-center">
+                        Final Sorted Output:
+                      </h3>
+                      <p className="text-lg font-medium text-yellow-200 text-center">
+                        {sorted.join(", ")}
+                      </p>
+                    </>
+                  )}
+                </motion.div>
+              )}
+
+              {/* Bucket Sort */}
+              {algorithm === "bucket" && buckets.length > 0 && (
+                <motion.div
+                  className="mt-10 bg-white bg-opacity-20 p-6 rounded-2xl shadow-lg w-full max-w-3xl"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                >
+                  <h3 className="text-2xl font-semibold mb-4 text-center">
+                    Bucket Distribution
+                  </h3>
+                  <table className="border-collapse border border-white text-center mx-auto mb-6">
+                    <thead>
+                      <tr>
+                        <th className="border border-white px-4 py-2">Bucket</th>
+                        <th className="border border-white px-4 py-2">Values</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {buckets.map((b, i) => (
+                        <tr key={i}>
+                          <td className="border border-white px-4 py-1">{i}</td>
+                          <td className="border border-white px-4 py-1">
+                            {b.map((num, j) => (
+                              <motion.span
+                                key={j}
+                                initial={{ opacity: 0, y: -6 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ duration: 0.4 }}
+                                className="inline-block mx-1 bg-yellow-300 text-black rounded px-2 py-1"
+                              >
+                                {num.toFixed(2)}
+                              </motion.span>
+                            ))}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+
+                  {/* 🟢 Final Sorted Output for Bucket Sort */}
+                  {sorted.length > 0 && (
+                    <>
+                      <h3 className="text-xl font-semibold mb-2 text-center">
+                        Final Sorted Output:
+                      </h3>
+                      <p className="text-lg font-medium text-yellow-200 text-center">
+                        {sorted.join(", ")}
+                      </p>
+                    </>
+                  )}
+                </motion.div>
+              )}
+            </div>
+
+            {/* Algorithm Info Box (unchanged) */}
+            <motion.div
+              className="md:w-1/3 w-full bg-white bg-opacity-20 p-6 rounded-2xl shadow-lg backdrop-blur-md self-stretch"
+              initial={{ x: 50, opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+            >
+              {algorithm ? (
+                <>
+                  <h2 className="text-3xl font-bold mb-4 text-yellow-300">
+                    {algorithmInfo[algorithm].title}
+                  </h2>
+                  <ul className="list-disc list-inside text-lg mb-4 space-y-2">
+                    {algorithmInfo[algorithm].steps.map((step, index) => (
+                      <li key={index}>{step}</li>
+                    ))}
+                  </ul>
+                  <p className="font-semibold text-xl text-green-200">
+                    {algorithmInfo[algorithm].complexity}
+                  </p>
+                </>
+              ) : (
+                <p className="text-lg text-center text-white/80">
+                  Select an algorithm to view its steps here!
+                </p>
+              )}
+            </motion.div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
+
 export default App;
