@@ -1,431 +1,747 @@
-import "./App.css";
-import React, { useState, useEffect, useRef } from "react";
-import { motion } from "framer-motion";
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 
-function App() {
-  const [algorithm, setAlgorithm] = useState("");
-  const [input, setInput] = useState("");
-  const [sorted, setSorted] = useState([]);
-  const [buckets, setBuckets] = useState([]);
-  const [radixSteps, setRadixSteps] = useState([]);
-  const [showRangeInput, setShowRangeInput] = useState(false);
-  const [countTable, setCountTable] = useState([]);
-  const resultRef = useRef(null);
+// --- CSS STYLES (Combined into the JS file) ---
+const styles = {
+  // New Color Palette:
+  // Primary Teal: #00b8a9
+  // Highlight Teal: #71eeb8
+  // Light Blue (Control Button): #4da6ff
+  // Array Box/Bar BG: #5fa3cf
+  
+  global: {
+    fontFamily: '"Inter", sans-serif',
+    backgroundColor: '#f5f5f5', // Light gray background
+    minHeight: '100vh',
+    padding: '20px',
+    color: '#333',
+  },
+  container: {
+    maxWidth: '1000px',
+    margin: '0 auto',
+    padding: '20px',
+    backgroundColor: '#fff',
+    borderRadius: '8px',
+    boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+  },
+  header: {
+    textAlign: 'center',
+    marginBottom: '20px',
+    fontSize: '1.5rem',
+    fontWeight: '600',
+    color: '#000a09ff', // Light Teal Header Color
+  },
+  buttonGroup: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: '10px',
+    marginBottom: '20px',
+  },
+  button: {
+    padding: '10px 15px',
+    borderRadius: '6px',
+    border: 'none',
+    cursor: 'pointer',
+    fontWeight: '500',
+    transition: 'background-color 0.15s ease, transform 0.05s ease',
+    flexGrow: 1,
+    minWidth: '120px',
+  },
+  algoButtonActive: {
+    backgroundColor: '#086e65ff', // Light Teal
+    color: 'white',
+    boxShadow: '0 2px 4px rgba(0, 184, 169, 0.3)',
+  },
+  algoButtonInactive: {
+    backgroundColor: '#e0e0e0',
+    color: '#333',
+  },
+  controlButton: {
+    backgroundColor: '#106dc9ff', // Light Blue
+    color: 'white',
+  },
+  controlButtonDisabled: {
+    backgroundColor: '#ccc',
+    cursor: 'not-allowed',
+  },
+  inputControl: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: '10px',
+    alignItems: 'center',
+    marginBottom: '20px',
+    padding: '15px',
+    backgroundColor: '#f9f9f9',
+    borderRadius: '6px',
+  },
+  input: {
+    padding: '8px 10px',
+    borderRadius: '6px',
+    border: '1px solid #ccc',
+    flexGrow: 1,
+    minWidth: '200px',
+  },
+  stepInfo: {
+    padding: '10px 15px',
+    backgroundColor: '#eee',
+    borderRadius: '6px',
+    marginBottom: '20px',
+    fontWeight: '600',
+    textAlign: 'center',
+    fontSize: '1.1rem',
+  },
+  arrayViz: {
+    display: 'flex',
+    gap: '4px',
+    justifyContent: 'center',
+    alignItems: 'flex-end',
+    height: '150px',
+    marginBottom: '30px',
+    borderBottom: '1px solid #ccc',
+    paddingBottom: '10px',
+    overflowX: 'auto',
+  },
+  arrayBar: (height, isHighlight) => ({
+    width: '30px',
+    height: `${height * 3}px`,
+    backgroundColor: isHighlight ? '#71eeb8' : '#5fa3cf', // Highlight Teal : Array Box BG
+    color: 'white',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '14px',
+    fontWeight: 'bold',
+    borderRadius: '3px 3px 0 0',
+    transition: 'height 0.3s ease, background-color 0.3s ease, transform 0.3s ease',
+    marginBottom: '-10px',
+    transform: isHighlight ? 'scale(1.05)' : 'scale(1)',
+  }),
+  arrayBox: (isHighlight) => ({
+    width: '40px',
+    height: '40px',
+    backgroundColor: isHighlight ? '#71eeb8' : '#5fa3cf', // Highlight Teal : Array Box BG
+    color: 'white',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: '4px',
+    fontWeight: 'bold',
+    transition: 'background-color 0.3s ease, transform 0.3s ease',
+    transform: isHighlight ? 'scale(1.05)' : 'scale(1)',
+    boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+  }),
+  pseudocodeSection: {
+    backgroundColor: '#2e2e2e', // Dark gray/black for code background
+    color: '#e0e0e0',
+    padding: '15px',
+    borderRadius: '6px',
+    lineHeight: '1.6',
+    fontSize: '0.9rem',
+    whiteSpace: 'pre-wrap',
+  },
+  codeLine: (isHighlighted) => ({
+    padding: '2px 5px',
+    borderRadius: '3px',
+    backgroundColor: isHighlighted ? '#00b8a9' : 'transparent', // Light Teal Highlight
+    color: isHighlighted ? 'white' : '#e0e0e0',
+    fontWeight: isHighlighted ? 'bold' : 'normal',
+    transition: 'background-color 0.2s ease',
+    display: 'block',
+  }),
+  auxiliaryViz: {
+    marginTop: '20px',
+    marginBottom: '20px',
+    padding: '15px',
+    backgroundColor: '#f0f0f0',
+    borderRadius: '6px',
+  },
+  auxiliaryRow: {
+    display: 'flex',
+    justifyContent: 'center',
+    gap: '4px',
+    marginBottom: '10px',
+    flexWrap: 'wrap',
+  },
+  auxiliaryCell: (isHighlight) => ({
+    width: '40px',
+    height: '40px',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: isHighlight ? '#71eeb8' : '#ddd', // Highlight Teal : Default Gray
+    border: '1px solid #ccc',
+    borderRadius: '4px',
+    fontSize: '0.8rem',
+    fontWeight: '500',
+    transition: 'background-color 0.3s ease',
+  }),
+  auxLabel: {
+    fontWeight: 'bold',
+    fontSize: '0.7rem',
+    color: '#555',
+    marginTop: '2px',
+  }
+};
+// --- END CSS STYLES ---
 
-  const isInitialView =
-    !algorithm &&
-    sorted.length === 0 &&
-    buckets.length === 0 &&
-    radixSteps.length === 0;
+// Initial array state (empty as requested)
+const INITIAL_ARRAY = [];
 
-  const algorithmInfo = {
-    counting: {
-      title: "Counting Sort Algorithm",
-      steps: [
-        "Initialize a count array C[0..k] with all zeros and an output array B[1..n].",
-        "Count the occurrence of each element in the input array A[1..n] by incrementing C[A[i]] for each element.",
-        "Modify the count array so that each C[i] contains the cumulative count of elements less than or equal to i.",
-        "Build the output array by traversing A from right to left, placing each element A[i] at position C[A[i]] in B, and then decrementing C[A[i]].",
-        "Copy all elements from B back into A so that A now contains the sorted elements in ascending order.",
-      ],
-      complexity: "Time Complexity: O(n + k)",
-    },
-    radix: {
-      title: "Radix Sort Algorithm",
-      steps: [
-        "Find the maximum element in the array to determine the number of digits in the largest number.",
-        "Set the digit position exp to 1 (representing the least significant digit).",
-        "While the maximum element divided by exp is greater than 0, perform a Counting Sort on the array based on the current digit (using (A[i] / exp) % 10 to get the digit value).",
-        "In the counting process, count the occurrences of each digit (0–9), compute cumulative counts, place elements in the output array according to their current digit, and then copy them back to the original array.",
-        "Multiply exp by 10 to move to the next more significant digit and repeat the process until all digits have been sorted.",
-      ],
-      complexity: "Time Complexity: O(d * (n + k))",
-    },
-    bucket: {
-      title: "Bucket Sort Algorithm",
-      steps: [
-        "Determine the number of buckets to be used and create an empty list (or array) of buckets.",
-        "Distribute all elements from the input array into their respective buckets based on a suitable mapping function (for example, using the value range or value × number of buckets).",
-        "Sort each individual bucket using an appropriate sorting algorithm such as insertion sort.",
-        "Concatenate all sorted buckets in order to form the final sorted array.",
-        "Copy the combined sorted elements back into the original array to get the final sorted result in ascending order.",
-      ],
-      complexity: "Time Complexity: O(n + k)",
-    },
-  };
+// --- PSEUDOCODE DEFINITIONS ---
+const PSEUDOCODE = {
+  counting: `// Counting Sort (Range K)
+1. function CountingSort(arr, n, k):
+2.   count = new Array(k + 1).fill(0)
+3.   output = new Array(n)
+4.
+5.   // 1. Count each element's frequency
+6.   for x in arr:
+7.     count[x] = count[x] + 1
+8.
+9.   // 2. Calculate cumulative sum
+10.  for i from 1 to k:
+11.    count[i] = count[i] + count[i-1]
+12.
+13.  // 3. Place elements into sorted order
+14.  for i from n-1 down to 0:
+15.    value = arr[i]
+16.    position = count[value] - 1
+17.    output[position] = value
+18.    count[value] = count[value] - 1
+19.
+20.  // 4. Copy output array back to arr
+21.  for i from 0 to n-1:
+22.    arr[i] = output[i]
+`,
+  bucket: `// Bucket Sort (N items, M buckets)
+1. function BucketSort(arr, n, m):
+2.   buckets = new Array(m)
+3.   Initialize all buckets as empty lists
+4.   max_val = max(arr)
+5.
+6.   // 1. Distribute elements into buckets
+7.   for x in arr:
+8.     bucket_index = floor(x * m / (max_val + 1))
+9.     buckets[bucket_index].append(x)
+10.
+11.  // 2. Sort each bucket
+12.  for i from 0 to m-1:
+13.    Sort(buckets[i]) // e.g., using Insertion Sort
+14.
+15.  // 3. Concatenate the sorted buckets
+16.  index = 0
+17.  for i from 0 to m-1:
+18.    for x in buckets[i]:
+19.      arr[index] = x
+20.      index = index + 1
+`,
+  radix: `// Radix Sort (base 10, using Counting Sort as subroutine)
+1. function RadixSort(arr):
+2.   max_val = max(arr)
+3.   exp = 1 // Start with the least significant digit (1s place)
+4.
+5.   // Loop through all digits (1, 10, 100, ...)
+6.   while max_val / exp > 0:
+7.     // Apply Counting Sort based on current digit (exp)
+8.     CountingSortByDigit(arr, exp)
+9.     exp = exp * 10
+10.
+11.
+// Subroutine: Counting Sort by specific digit (exp)
+12. function CountingSortByDigit(arr, exp):
+13.  count = new Array(10).fill(0)
+14.  output = new Array(n)
+15.
+16.  // 1. Count frequencies of digit
+17.  for x in arr:
+18.    digit = (x / exp) % 10
+19.    count[digit] = count[digit] + 1
+20.
+21.  // 2. Calculate cumulative sum
+22.  for i from 1 to 9:
+23.    count[i] = count[i] + count[i-1]
+24.
+25.  // 3. Place elements into sorted order
+26.  for i from n-1 down to 0:
+27.    value = arr[i]
+28.    digit = (value / exp) % 10
+29.    position = count[digit] - 1
+30.    output[position] = value
+31.    count[digit] = count[digit] - 1
+32.
+33.  // 4. Copy output array back to arr
+34.  for i from 0 to n-1:
+35.    arr[i] = output[i]
+`
+};
+// --- END PSEUDOCODE DEFINITIONS ---
 
-  const countingSort = (arr) => {
-    if (!arr.length) return [];
+// Helper function to generate a random array
+const generateRandomArray = () => {
+  const size = Math.floor(Math.random() * 8) + 5; // 5 to 12 elements
+  // Note: Radix and Counting Sort work best when the numbers are small and positive
+  return Array.from({ length: size }, () => Math.floor(Math.random() * 50) + 1); 
+};
 
-    let max = Math.max(...arr);
-    let min = Math.min(...arr);
-    let range = max - min + 1;
-    let count = new Array(range).fill(0);
-    let output = new Array(arr.length);
+// --- SORTING ALGORITHM LOGIC (Generates History) ---
 
-    for (let i = 0; i < arr.length; i++) count[arr[i] - min]++;
+// 1. Counting Sort History Generator
+const getCountingSortSteps = (initialArr) => {
+  const steps = [];
+  let currentArr = [...initialArr];
+  const n = currentArr.length;
+  if (n === 0) return steps;
 
-    const tableData = [];
-    for (let i = min; i <= max; i++) {
-      tableData.push({ number: i, count: count[i - min] });
+  const maxVal = Math.max(...currentArr);
+  const k = maxVal; // Range K is maxVal
+  
+  // Step 1: Initialization
+  let count = Array(k + 1).fill(0);
+  let output = Array(n).fill(null);
+  steps.push({ array: [...currentArr], auxiliary: { count: [...count], output: [...output] }, highlightLine: 2, description: 'Initialize Count and Output arrays.' });
+  steps.push({ array: [...currentArr], auxiliary: { count: [...count], output: [...output] }, highlightLine: 3, description: 'Initialize Count and Output arrays.' });
+
+  // Step 2: Count Frequencies (Lines 6-8)
+  for (let i = 0; i < n; i++) {
+    const val = currentArr[i];
+    count[val]++;
+    steps.push({ array: [...currentArr], highlightIndices: [i], auxiliary: { count: [...count], output: [...output] }, highlightLine: 7, description: `Counting element ${val}. count[${val}] = ${count[val]}` });
+  }
+
+  // Step 3: Cumulative Sum (Lines 10-12)
+  for (let i = 1; i <= k; i++) {
+    if (i < count.length) {
+      count[i] = count[i] + count[i - 1];
+      steps.push({ array: [...currentArr], highlightIndices: [i], auxiliary: { count: [...count], output: [...output] }, highlightLine: 11, description: `Cumulative sum at index ${i}.` });
     }
-    setCountTable(tableData);
+  }
 
-    for (let i = 1; i < count.length; i++) count[i] += count[i - 1];
-    for (let i = arr.length - 1; i >= 0; i--) {
-      output[count[arr[i] - min] - 1] = arr[i];
-      count[arr[i] - min]--;
-    }
+  // Step 4: Place elements (Lines 14-18)
+  // This must be done in reverse for stability
+  for (let i = n - 1; i >= 0; i--) {
+    const value = currentArr[i];
+    const position = count[value] - 1;
 
-    return output;
-  };
+    steps.push({ array: [...currentArr], highlightIndices: [i], auxiliary: { count: [...count], output: [...output] }, highlightLine: 15, description: `Processing element ${value} at index ${i}.` });
 
-  const countingSortForRadix = (arr, exp) => {
-    let output = new Array(arr.length).fill(0);
-    let count = new Array(10).fill(0);
+    steps.push({ array: [...currentArr], highlightIndices: [i], auxiliary: { count: [...count], output: [...output] }, highlightLine: 16, description: `Calculated position in output: ${position}.` });
 
-    for (let i = 0; i < arr.length; i++) {
-      count[Math.floor(arr[i] / exp) % 10]++;
-    }
+    output[position] = value;
+    steps.push({ array: [...currentArr], highlightIndices: [i], auxiliary: { count: [...count], output: [...output] }, highlightLine: 17, description: `Place ${value} at output index ${position}.` });
 
-    for (let i = 1; i < 10; i++) count[i] += count[i - 1];
+    count[value]--;
+    steps.push({ array: [...currentArr], highlightIndices: [i], auxiliary: { count: [...count], output: [...output] }, highlightLine: 18, description: `Decrement count[${value}].` });
+  }
 
-    for (let i = arr.length - 1; i >= 0; i--) {
-      let index = Math.floor(arr[i] / exp) % 10;
-      output[count[index] - 1] = arr[i];
-      count[index]--;
-    }
+  // Step 5: Copy back (Lines 21-22)
+  for (let i = 0; i < n; i++) {
+    currentArr[i] = output[i];
+    steps.push({ array: [...currentArr], highlightIndices: [i], auxiliary: { count: [...count], output: [...output] }, highlightLine: 22, description: `Copying sorted element back: ${currentArr[i]}` });
+  }
 
-    for (let i = 0; i < arr.length; i++) arr[i] = output[i];
-  };
+  // Final State
+  steps.push({ array: [...currentArr], auxiliary: { count: [...count], output: [...output] }, highlightLine: 0, description: 'Sort finished.' });
+  return steps;
+};
 
-  const radixSort = async (arr) => {
-    setRadixSteps([]);
-    const steps = [];
-    if (!arr.length) return arr;
-    const max = Math.max(...arr);
+// 2. Bucket Sort History Generator
+const getBucketSortSteps = (initialArr) => {
+  const steps = [];
+  let currentArr = [...initialArr];
+  const n = currentArr.length;
+  if (n === 0) return steps;
 
-    for (let exp = 1; Math.floor(max / exp) > 0; exp *= 10) {
-      countingSortForRadix(arr, exp);
+  const maxVal = Math.max(...currentArr);
+  const numBuckets = 5; // Fixed 5 buckets for visualization simplicity
+
+  // Step 1: Initialize Buckets
+  const buckets = Array.from({ length: numBuckets }, () => []);
+  steps.push({ array: [...currentArr], auxiliary: { buckets: buckets.map(b => [...b]) }, highlightLine: 2, description: 'Initialize 5 empty buckets.' });
+
+  // Step 2: Distribution (Lines 7-9)
+  for (let i = 0; i < n; i++) {
+    const value = currentArr[i];
+    const bucketIndex = Math.floor(value * numBuckets / (maxVal + 1));
+    buckets[bucketIndex].push(value);
+
+    steps.push({
+      array: [...currentArr],
+      highlightIndices: [i],
+      auxiliary: { buckets: buckets.map(b => [...b]) },
+      highlightLine: 9,
+      description: `Placing ${value} into Bucket ${bucketIndex}.`
+    });
+  }
+
+  // Step 3: Sort Buckets (Lines 12-14)
+  for (let i = 0; i < numBuckets; i++) {
+    buckets[i].sort((a, b) => a - b); // Sorting each bucket (simulated)
+    steps.push({
+      array: [...currentArr],
+      auxiliary: { buckets: buckets.map(b => [...b]) },
+      highlightLine: 13,
+      description: `Sorting Bucket ${i}.`
+    });
+  }
+
+  // Step 4: Concatenate (Lines 17-20)
+  let k = 0;
+  for (let i = 0; i < numBuckets; i++) {
+    for (const value of buckets[i]) {
+      currentArr[k] = value;
       steps.push({
-        exp,
-        result: [...arr],
+        array: [...currentArr],
+        highlightIndices: [k],
+        auxiliary: { buckets: buckets.map(b => [...b]) },
+        highlightLine: 19,
+        description: `Concatenating ${value} from Bucket ${i} to main array index ${k}.`
       });
-      setRadixSteps([...steps]);
-      await new Promise((resolve) => setTimeout(resolve, 600));
+      k++;
     }
+  }
 
-    return arr;
-  };
+  // Final State
+  steps.push({ array: [...currentArr], auxiliary: { buckets: buckets.map(b => [...b]) }, highlightLine: 0, description: 'Sort finished.' });
+  return steps;
+};
 
-  const bucketSort = async (arr) => {
-    let n = arr.length;
-    let newBuckets = Array.from({ length: 10 }, () => []);
-    setBuckets([...newBuckets]);
+// 3. Radix Sort History Generator
+const getRadixSortSteps = (initialArr) => {
+  const steps = [];
+  let currentArr = [...initialArr];
+  const n = currentArr.length;
+  if (n === 0) return steps;
 
+  const maxVal = Math.max(...currentArr);
+  let exp = 1;
+
+  steps.push({ array: [...currentArr], auxiliary: {}, highlightLine: 3, description: 'Starting Radix Sort. Max value is ' + maxVal });
+
+  while (Math.floor(maxVal / exp) > 0) {
+    steps.push({ array: [...currentArr], auxiliary: {}, highlightLine: 6, description: `Starting pass for digit: ${exp}` });
+
+    // --- Counting Sort Subroutine for current digit (exp) ---
+    const k = 10; // Digits 0-9
+    let count = Array(k).fill(0);
+    let output = Array(n).fill(null);
+
+    // Initialization step in subroutine
+    steps.push({ array: [...currentArr], auxiliary: { count: [...count] }, highlightLine: 13, description: `Initialize count array for ${exp}'s place.` });
+
+    // 1. Count Frequencies (Lines 17-19)
     for (let i = 0; i < n; i++) {
-      let index = Math.floor(arr[i] * 10);
-      newBuckets[index].push(arr[i]);
-      setBuckets([...newBuckets]);
-      await new Promise((resolve) => setTimeout(resolve, 350));
+      const val = currentArr[i];
+      const digit = Math.floor(val / exp) % 10;
+      count[digit]++;
+      steps.push({ array: [...currentArr], highlightIndices: [i], auxiliary: { count: [...count] }, highlightLine: 19, description: `Counting digit ${digit} of ${val}.` });
     }
 
-    for (let i = 0; i < 10; i++) newBuckets[i].sort((a, b) => a - b);
-    return newBuckets.flat();
+    // 2. Cumulative Sum (Lines 22-23)
+    for (let i = 1; i < k; i++) {
+      count[i] = count[i] + count[i - 1];
+      steps.push({ array: [...currentArr], auxiliary: { count: [...count] }, highlightLine: 23, description: `Cumulative sum on count array.` });
+    }
+
+    // 3. Place elements (Lines 26-31)
+    for (let i = n - 1; i >= 0; i--) {
+      const value = currentArr[i];
+      const digit = Math.floor(value / exp) % 10;
+      const position = count[digit] - 1;
+
+      steps.push({ array: [...currentArr], highlightIndices: [i], auxiliary: { count: [...count], output: [...output] }, highlightLine: 28, description: `Processing ${value}. Digit is ${digit}.` });
+
+      output[position] = value;
+      steps.push({ array: [...currentArr], highlightIndices: [i], auxiliary: { count: [...count], output: [...output] }, highlightLine: 30, description: `Place ${value} at output index ${position}.` });
+
+      count[digit]--;
+      steps.push({ array: [...currentArr], highlightIndices: [i], auxiliary: { count: [...count], output: [...output] }, highlightLine: 31, description: `Decrement count[${digit}].` });
+    }
+
+    // 4. Copy back (Lines 34-35)
+    for (let i = 0; i < n; i++) {
+      currentArr[i] = output[i];
+      steps.push({ array: [...currentArr], highlightIndices: [i], auxiliary: { count: [...count], output: [...output] }, highlightLine: 35, description: `Copying sorted element back.` });
+    }
+
+    exp *= 10;
+    steps.push({ array: [...currentArr], auxiliary: {}, highlightLine: 9, description: `Moving to the next digit.` });
+  }
+
+  // Final State
+  steps.push({ array: [...currentArr], auxiliary: {}, highlightLine: 0, description: 'Radix Sort finished.' });
+  return steps;
+};
+
+// --- MAIN REACT COMPONENT ---
+const VisualizationApp = () => {
+  const [algorithm, setAlgorithm] = useState('counting'); // 'counting', 'bucket', 'radix'
+  const [initialArray, setInitialArray] = useState(INITIAL_ARRAY);
+  const [array, setArray] = useState(INITIAL_ARRAY);
+  const [inputArrayText, setInputArrayText] = useState(""); // Empty initial input text
+
+  const [speed, setSpeed] = useState(500); // milliseconds
+  const [isSorting, setIsSorting] = useState(false);
+  const [currentStep, setCurrentStep] = useState(0);
+  const [history, setHistory] = useState([]);
+
+  // Memoize the sorting steps generation based on algorithm and initial array
+  const generateHistory = useCallback(() => {
+    const arr = [...initialArray];
+    switch (algorithm) {
+      case 'counting':
+        return getCountingSortSteps(arr);
+      case 'bucket':
+        return getBucketSortSteps(arr);
+      case 'radix':
+        return getRadixSortSteps(arr);
+      default:
+        return [];
+    }
+  }, [algorithm, initialArray]);
+
+  // Handle Input Parsing and Array Update
+  const parseInput = (text) => {
+    const newArr = text
+      .split(',')
+      .map(s => parseInt(s.trim()))
+      .filter(n => !isNaN(n) && n >= 0 && n <= 100); // Filter for valid, non-negative numbers up to 100
+    
+    // Use the parsed array if valid, otherwise use an empty array (INITIAL_ARRAY)
+    const finalArr = newArr.length > 0 ? newArr : INITIAL_ARRAY; 
+    
+    setInitialArray(finalArr);
+    setArray(finalArr);
+    setInputArrayText(finalArr.join(', '));
+    setCurrentStep(0);
+    setIsSorting(false);
+    setHistory([]);
   };
 
-  const handleSort = async () => {
-    if (!input.trim()) {
-      alert("Please enter numbers first!");
-      return;
-    }
-
-    let arr = input
-      .split(",")
-      .map((n) => parseFloat(n.trim()))
-      .filter((n) => !Number.isNaN(n));
-    if (!arr.length) {
-      alert("Please enter valid numbers separated by commas.");
-      return;
-    }
-
-    let result = [];
-    setCountTable([]);
-
-    if (algorithm === "counting") {
-      result = countingSort(arr);
-    } else if (algorithm === "radix") {
-      setRadixSteps([]);
-      result = await radixSort(arr);
-    } else if (algorithm === "bucket") {
-      if (arr.some((n) => n < 0 || n > 1)) {
-        alert("All numbers must be between 0 and 1 for Bucket Sort");
-        return;
-      }
-      result = await bucketSort(arr);
-    }
-
-    setSorted(result);
-    setInput("");
-
-    setTimeout(() => {
-      if (resultRef.current)
-        resultRef.current.scrollIntoView({ behavior: "smooth" });
-    }, 250);
+  // START button logic
+  const handleStart = () => {
+    if (isSorting || array.length === 0) return; // Prevent start if sorting or array is empty
+    const newHistory = generateHistory();
+    setHistory(newHistory);
+    setCurrentStep(0);
+    setIsSorting(true);
   };
 
+  // NEXT STEP logic (runs via interval)
   useEffect(() => {
-    if ((buckets.length > 0 || radixSteps.length > 0) && resultRef.current) {
-      resultRef.current.scrollIntoView({ behavior: "smooth" });
+    let intervalId;
+    if (isSorting && currentStep < history.length - 1) {
+      intervalId = setInterval(() => {
+        setCurrentStep(prev => prev + 1);
+      }, speed);
+    } else if (currentStep === history.length - 1 && history.length > 0) {
+      setIsSorting(false);
     }
-  }, [buckets, radixSteps]);
+
+    // Cleanup function
+    return () => clearInterval(intervalId);
+  }, [isSorting, currentStep, history.length, speed]);
+
+  // Update array state on step change
+  useEffect(() => {
+    if (history.length > 0 && currentStep < history.length) {
+      setArray(history[currentStep].array);
+    }
+  }, [currentStep, history]);
+
+  // RESET button logic
+  const handleReset = () => {
+    setIsSorting(false);
+    setCurrentStep(0);
+    setArray(initialArray);
+    setHistory([]);
+  };
+
+  // Helper to retrieve current step data
+  const currentStepData = history.length > 0 ? history[currentStep] : null;
+  const currentHighlightLine = currentStepData?.highlightLine || 0;
+  const currentHighlightIndices = currentStepData?.highlightIndices || [];
+  const currentAuxiliary = currentStepData?.auxiliary || {};
+
+  const pseudocode = PSEUDOCODE[algorithm];
+
+  // Helper to display auxiliary data
+  const AuxiliaryDisplay = ({ data, algorithm }) => {
+    if (algorithm === 'counting' && data.count) {
+      const count = data.count;
+      return (
+        <div style={styles.auxiliaryViz}>
+          <h4 style={{textAlign: 'center', margin: '0 0 10px 0'}}>Count Array (Index = Value)</h4>
+          <div style={styles.auxiliaryRow}>
+            {count.map((value, index) => (
+              <div key={`count-${index}`} style={styles.auxiliaryCell(currentHighlightIndices.includes(index))}>
+                {value}
+                <span style={styles.auxLabel}>[{index}]</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+    if (algorithm === 'radix' && data.count) {
+        const count = data.count;
+        return (
+          <div style={styles.auxiliaryViz}>
+            <h4 style={{textAlign: 'center', margin: '0 0 10px 0'}}>Count Array (Index = Digit)</h4>
+            <div style={styles.auxiliaryRow}>
+              {count.map((value, index) => (
+                <div key={`count-${index}`} style={styles.auxiliaryCell(false)}>
+                  {value}
+                  <span style={styles.auxLabel}>[{index}]</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      }
+    if (algorithm === 'bucket' && data.buckets) {
+      const buckets = data.buckets;
+      return (
+        <div style={styles.auxiliaryViz}>
+          <h4 style={{textAlign: 'center', margin: '0 0 10px 0'}}>Buckets</h4>
+          <div style={{display: 'flex', justifyContent: 'center', flexWrap: 'wrap', gap: '20px'}}>
+            {buckets.map((bucket, index) => (
+              <div key={`bucket-${index}`} style={{padding: '10px', border: '1px solid #ccc', borderRadius: '4px', minWidth: '100px'}}>
+                <div style={{...styles.auxLabel, color: '#00b8a9', fontSize: '0.9rem'}}>Bucket {index}</div>
+                <div style={{display: 'flex', gap: '5px', flexWrap: 'wrap', marginTop: '5px'}}>
+                  {bucket.length > 0 ? bucket.map((val, idx) => (
+                    <span key={`bval-${index}-${idx}`} style={styles.arrayBox(false)}>{val}</span>
+                  )) : (
+                    <span style={{color: '#999', fontSize: '0.8rem'}}>Empty</span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+    return null;
+  };
 
   return (
-    <div className="app-root min-h-screen w-full bg-gradient-to-br from-purple-600 via-pink-500 to-yellow-400 text-white">
-      <div
-        className={`layout-wrapper w-full ${
-          isInitialView ? "min-h-screen flex items-center" : "pt-6 pb-12"
-        }`}
-      >
-        <div className="container mx-auto px-6">
-          <div className={`flex flex-col md:flex-row items-start justify-center gap-6`}>
+    <div style={styles.global}>
+      <div style={styles.container}>
+        <h1 style={styles.header}>Linear Time Sorting</h1>
+
+        {/* Algorithm Selection Buttons */}
+        <div style={styles.buttonGroup}>
+          <button
+            onClick={() => setAlgorithm('counting')}
+            style={{ ...styles.button, ...(algorithm === 'counting' ? styles.algoButtonActive : styles.algoButtonInactive) }}
+          >
+            Counting Sort
+          </button>
+          <button
+            onClick={() => setAlgorithm('bucket')}
+            style={{ ...styles.button, ...(algorithm === 'bucket' ? styles.algoButtonActive : styles.algoButtonInactive) }}
+          >
+            Bucket Sort
+          </button>
+          <button
+            onClick={() => setAlgorithm('radix')}
+            style={{ ...styles.button, ...(algorithm === 'radix' ? styles.algoButtonActive : styles.algoButtonInactive) }}
+          >
+            Radix Sort
+          </button>
+        </div>
+
+        {/* Input and Controls */}
+        <div style={styles.inputControl}>
+          <label style={{whiteSpace: 'nowrap'}}>Enter numbers (0-100, comma-separated):</label>
+          <input
+            type="text"
+            value={inputArrayText}
+            onChange={(e) => setInputArrayText(e.target.value)}
+            style={styles.input}
+            disabled={isSorting}
+          />
+
+          <button
+            onClick={() => parseInput(inputArrayText)}
+            style={{ ...styles.button, ...styles.controlButton }}
+            disabled={isSorting}
+          >
+            Load
+          </button>
+          <button
+            onClick={handleStart}
+            style={{ 
+              ...styles.button, 
+              ...(isSorting || initialArray.length === 0 || history.length > 0 ? styles.controlButtonDisabled : styles.controlButton) 
+            }}
+            disabled={isSorting || initialArray.length === 0 || history.length > 0}
+          >
+            Start
+          </button>
+          <button
+            onClick={handleReset}
+            style={{ ...styles.button, ...styles.controlButton }}
+          >
+            Reset
+          </button>
+          <button
+            onClick={() => parseInput(generateRandomArray().join(', '))}
+            style={{ ...styles.button, ...styles.controlButton }}
+            disabled={isSorting}
+          >
+            Generate New Array
+          </button>
+          <label style={{marginLeft: '10px', whiteSpace: 'nowrap'}}>Speed (ms):</label>
+          <select
+            value={speed}
+            onChange={(e) => setSpeed(parseInt(e.target.value))}
+            style={{...styles.input, maxWidth: '100px'}}
+            disabled={isSorting}
+          >
+            <option value={1000}>Slow (1000ms)</option>
+            <option value={500}>Medium (500ms)</option>
+            <option value={200}>Fast (200ms)</option>
+          </select>
+        </div>
+
+        {/* Status and Array Visualization */}
+        <div style={styles.stepInfo}>
+          Current Step: {currentStep} / {history.length > 0 ? history.length - 1 : 0}
+          {currentStepData && <div style={{marginTop: '5px', fontSize: '0.9rem', fontWeight: 'normal', color: '#666'}}>{currentStepData.description}</div>}
+        </div>
+
+        <h3 style={{textAlign: 'center'}}>Current Array</h3>
+        <div style={styles.arrayViz}>
+          {array.length > 0 ? array.map((value, index) => (
             <div
-              className={`flex-1 flex flex-col items-center ${
-                isInitialView ? "justify-center" : "justify-start"
-              }`}
+              key={index}
+              style={styles.arrayBox(currentHighlightIndices.includes(index))}
             >
-              <motion.h1
-                className="text-5xl font-extrabold mb-6 text-center drop-shadow-lg"
-                initial={{ y: -30, opacity: 0 }}
-                animate={{ y: 0, opacity: 1 }}
-              >
-                Linear Time Sorting
-              </motion.h1>
-
-              <motion.h2
-                className="text-2xl font-semibold mb-6 text-center"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-              >
-                Choose a Sorting Algorithm
-              </motion.h2>
-
-              <div className="flex gap-4 mb-6 flex-wrap justify-center">
-                {["counting", "radix", "bucket"].map((algo) => (
-                  <button
-                    key={algo}
-                    onClick={() => {
-                      setAlgorithm(algo);
-                      setSorted([]);
-                      setBuckets([]);
-                      setRadixSteps([]);
-                      setCountTable([]);
-                      setInput("");
-                      setShowRangeInput(algo === "bucket");
-                    }}
-                    className={`px-6 py-2 rounded-2xl text-lg font-bold transition-all duration-300 ${
-                      algorithm === algo
-                        ? "bg-green-400 text-black"
-                        : "bg-white text-purple-700 hover:bg-green-300"
-                    }`}
-                  >
-                    {algo.charAt(0).toUpperCase() + algo.slice(1)} Sort
-                  </button>
-                ))}
-              </div>
-
-              {showRangeInput && (
-                <div className="mb-6 text-center">
-                  <label className="mr-4 text-lg font-medium">Range: 0 to 1</label>
-                </div>
-              )}
-
-              {algorithm && (
-                <div className="text-center">
-                  <input
-                    type="text"
-                    placeholder={
-                      algorithm === "bucket"
-                        ? "Enter numbers between 0 and 1, separated by commas"
-                        : "Enter integers separated by commas"
-                    }
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                    className="px-4 py-2 rounded-xl text-black w-80 text-center mb-4 focus:ring-2 focus:ring-yellow-400"
-                  />
-                  <br />
-                  <button
-                    onClick={handleSort}
-                    className="bg-yellow-400 text-black px-6 py-2 rounded-xl font-bold hover:bg-yellow-300 transition-all"
-                  >
-                    Sort Now
-                  </button>
-                </div>
-              )}
-
-              {/* Counting Sort Table */}
-              {algorithm === "counting" && countTable.length > 0 && (
-                <motion.div
-                  className="mt-10 bg-white bg-opacity-20 p-6 rounded-2xl shadow-lg w-full max-w-3xl"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                >
-                  <h3 className="text-2xl font-semibold mb-4 text-center text-yellow-300">
-                    Counting Table
-                  </h3>
-                  <table className="border-collapse border border-white text-center mx-auto mb-6">
-                    <thead>
-                      <tr>
-                        <th className="border border-white px-4 py-2">Number</th>
-                        <th className="border border-white px-4 py-2">Count</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {countTable.map((row, i) => (
-                        <tr key={i}>
-                          <td className="border border-white px-4 py-1">{row.number}</td>
-                          <td className="border border-white px-4 py-1">{row.count}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                  {sorted.length > 0 && (
-                    <>
-                      <h3 className="text-xl font-semibold mb-2 text-center">
-                        Final Sorted Output:
-                      </h3>
-                      <p className="text-lg font-medium text-yellow-200 text-center">
-                        {sorted.join(", ")}
-                      </p>
-                    </>
-                  )}
-                </motion.div>
-              )}
-
-              {/* Radix Sort */}
-              {algorithm === "radix" && radixSteps.length > 0 && (
-                <motion.div
-                  className="mt-10 bg-white bg-opacity-20 p-6 rounded-2xl shadow-lg w-full max-w-3xl"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                >
-                  <h3 className="text-2xl font-semibold mb-4 text-center text-yellow-300">
-                    Step-by-Step Radix Sort Progress
-                  </h3>
-                  <div className="flex flex-col gap-4 mb-6">
-                    {radixSteps.map((step, i) => (
-                      <motion.div
-                        key={i}
-                        className="bg-yellow-300/20 rounded-xl p-4 text-center"
-                        initial={{ opacity: 0, y: -8 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.5 }}
-                      >
-                        <p className="font-semibold mb-2">Digit Place: {step.exp}</p>
-                        <p className="text-lg font-medium">{step.result.join(", ")}</p>
-                      </motion.div>
-                    ))}
-                  </div>
-
-                  {/* 🟢 Final Sorted Output for Radix Sort */}
-                  {sorted.length > 0 && (
-                    <>
-                      <h3 className="text-xl font-semibold mb-2 text-center">
-                        Final Sorted Output:
-                      </h3>
-                      <p className="text-lg font-medium text-yellow-200 text-center">
-                        {sorted.join(", ")}
-                      </p>
-                    </>
-                  )}
-                </motion.div>
-              )}
-
-              {/* Bucket Sort */}
-              {algorithm === "bucket" && buckets.length > 0 && (
-                <motion.div
-                  className="mt-10 bg-white bg-opacity-20 p-6 rounded-2xl shadow-lg w-full max-w-3xl"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                >
-                  <h3 className="text-2xl font-semibold mb-4 text-center">
-                    Bucket Distribution
-                  </h3>
-                  <table className="border-collapse border border-white text-center mx-auto mb-6">
-                    <thead>
-                      <tr>
-                        <th className="border border-white px-4 py-2">Bucket</th>
-                        <th className="border border-white px-4 py-2">Values</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {buckets.map((b, i) => (
-                        <tr key={i}>
-                          <td className="border border-white px-4 py-1">{i}</td>
-                          <td className="border border-white px-4 py-1">
-                            {b.map((num, j) => (
-                              <motion.span
-                                key={j}
-                                initial={{ opacity: 0, y: -6 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ duration: 0.4 }}
-                                className="inline-block mx-1 bg-yellow-300 text-black rounded px-2 py-1"
-                              >
-                                {num.toFixed(2)}
-                              </motion.span>
-                            ))}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-
-                  {/* 🟢 Final Sorted Output for Bucket Sort */}
-                  {sorted.length > 0 && (
-                    <>
-                      <h3 className="text-xl font-semibold mb-2 text-center">
-                        Final Sorted Output:
-                      </h3>
-                      <p className="text-lg font-medium text-yellow-200 text-center">
-                        {sorted.join(", ")}
-                      </p>
-                    </>
-                  )}
-                </motion.div>
-              )}
+              {value}
             </div>
+          )) : (
+            <div style={{color: '#888', padding: '10px'}}>Please Load or Generate an array to begin visualization.</div>
+          )}
+        </div>
 
-            {/* Algorithm Info Box (unchanged) */}
-            <motion.div
-              className="md:w-1/3 w-full bg-white bg-opacity-20 p-6 rounded-2xl shadow-lg backdrop-blur-md self-stretch"
-              initial={{ x: 50, opacity: 0 }}
-              animate={{ x: 0, opacity: 1 }}
+        {/* Auxiliary Visualization (Count/Bucket) */}
+        <AuxiliaryDisplay data={currentAuxiliary} algorithm={algorithm} />
+
+        {/* Pseudocode Section */}
+        <h3 style={{marginTop: '40px', marginBottom: '10px'}}>C++ Pseudocode: {algorithm.charAt(0).toUpperCase() + algorithm.slice(1)} Sort</h3>
+        <div style={styles.pseudocodeSection}>
+          {pseudocode.split('\n').map((line, index) => (
+            <span
+              key={index}
+              style={styles.codeLine(line.trim().startsWith(currentHighlightLine + '.') || line.trim().startsWith(currentHighlightLine + '.'))}
             >
-              {algorithm ? (
-                <>
-                  <h2 className="text-3xl font-bold mb-4 text-yellow-300">
-                    {algorithmInfo[algorithm].title}
-                  </h2>
-                  <ul className="list-disc list-inside text-lg mb-4 space-y-2">
-                    {algorithmInfo[algorithm].steps.map((step, index) => (
-                      <li key={index}>{step}</li>
-                    ))}
-                  </ul>
-                  <p className="font-semibold text-xl text-green-200">
-                    {algorithmInfo[algorithm].complexity}
-                  </p>
-                </>
-              ) : (
-                <p className="text-lg text-center text-white/80">
-                  Select an algorithm to view its steps here!
-                </p>
-              )}
-            </motion.div>
-          </div>
+              {line}
+            </span>
+          ))}
         </div>
       </div>
     </div>
   );
-}
+};
 
-export default App;
+export default VisualizationApp;
